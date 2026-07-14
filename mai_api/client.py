@@ -4,10 +4,10 @@ import random
 import logging
 from lxml import etree
 
-from typing import Literal
+from typing import Literal, Union
 
 from .constants import API_BASE, USER_AGENTS
-from .player import SelfPlayer
+from .player import SelfPlayer, FriendPartial
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -217,7 +217,7 @@ class MaiAPIClient:
         user_name = player_dom.xpath('//div[contains(@class, "name_block")]/text()')
         rating_block_url = player_dom.xpath('//img[contains(@class, "h_30") and contains(@class, "f_r")]/@src')
         rating = player_dom.xpath('//div[@class="rating_block"]/text()')
-        cource_rank_url = player_dom.xpath('//img[contains(@class, "h_35") and contains(@class, "f_l")]/@src')
+        course_rank_url = player_dom.xpath('//img[contains(@class, "h_35") and contains(@class, "f_l")]/@src')
         class_rank_url = player_dom.xpath('//img[contains(@class, "w_160") and contains(@class, "p_15") and contains(@class, "m_r_10")]/@src')
 
         # Player icon
@@ -287,7 +287,7 @@ class MaiAPIClient:
             "name": user_name[0] if user_name else "NAME_ERROR",
             "rating_block": rating_block_url[0] if rating_block_url else "N/A",
             "rating": rating_int,
-            "cource_rank_url": cource_rank_url[0] if cource_rank_url else "N/A",
+            "course_rank_url": course_rank_url[0] if course_rank_url else "N/A",
             "class_rank_url": class_rank_url[0] if class_rank_url else "N/A",
             "icon_url": icon_url[0] if icon_url else "N/A",
             "nameplate_url": nameplate_url[0] if nameplate_url else "N/A",
@@ -306,3 +306,146 @@ class MaiAPIClient:
         }
 
         return SelfPlayer()._construct_from_dict(user_info)
+    
+    async def get_friends(self):
+        """Fetch friend list data"""
+        friends_list = []
+        friend_dom = await self._fetch_dom("friend/")
+        friend_block_list = friend_dom.xpath('//div[contains(@class, "see_through_block") and contains(@class, "p_10")]')
+
+        # Loop through each friend block
+        for friend_block in friend_block_list:
+            friend_id = friend_block.xpath('.//input[contains(@name, "idx")]/@value')[0]
+            friend_name = friend_block.xpath('.//div[contains(@class, "name_block")]/text()')[0].strip()
+            friend_icon = friend_block.xpath('.//img[contains(@class, "w_112") and contains(@src, "img/Icon")]/@src')[0]
+            
+            trophy_type_block = friend_block.xpath('.//div[contains(@class, "trophy_block") and contains(@class, "f_0")]/@class')
+            
+            trophy_type = trophy_type_block[0].split(" ")[1] if trophy_type_block else "rainbow"
+            trophy_type = "rainbow" if trophy_type == "ランダム" else trophy_type.split("_")[1] if "_" in trophy_type else trophy_type
+
+            trophy_blocks = friend_block.xpath('.//div[contains(@class, "trophy_inner_block") and contains(@class, "f_13")]')
+            if trophy_blocks:
+                trophy_block = trophy_blocks[0]
+                trophy_texts = trophy_block.xpath('.//text()')
+                trophy_content = trophy_texts[1] if len(trophy_texts) > 1 else "ERROR"
+            else:
+                trophy_content = "ERROR"
+
+            friend_title = {"text": trophy_content, "rarity": trophy_type}
+
+            friend_rating = friend_block.xpath('.//div[contains(@class, "rating_block")]/text()')[0].strip()
+            friend_rating_frame = friend_block.xpath('.//img[contains(@src, "rating_base")]/@src')[0]
+
+            friend_course_rank = friend_block.xpath('.//img[contains(@src, "course_rank")]/@src')[0]
+            friend_class_rank = friend_block.xpath('.//img[contains(@src, "class_rank")]/@src')[0]
+            friend_stars = friend_block.xpath('.//div[contains(@class, "p_l_10") and contains(@class, "f_14")]/text()')[0].strip().replace('×', '')
+
+            friend_favorite_icon = friend_block.xpath('.//img[contains(@class, "friend_favorite_icon")]/@src')
+            friend_favorite = len(friend_favorite_icon) > 0
+
+            friend_info = {
+                'id': friend_id,
+                'name': friend_name,
+                'icon': friend_icon,
+                'rating': friend_rating,
+                'rating_frame': friend_rating_frame,
+                'course_rank_url': friend_course_rank,
+                'class_rank_url': friend_class_rank,
+                'stars': friend_stars,
+                'favorite': friend_favorite,
+                'title': friend_title
+            }
+
+            friends_list.append(FriendPartial()._construct_from_dict(friend_info))
+        return friends_list
+    
+    async def fetch_friend_details(self, friend: Union[FriendPartial, str]) -> Union[FriendPartial, None]:
+        """Fetch detailed information for a specific friend
+        Args:
+            friend (Union[FriendPartial, str]): FriendPartial object or friend ID string.
+        """
+        friend_id = friend.id if isinstance(friend, FriendPartial) else friend
+        friend_dom = await self._fetch_dom(f"friend/friendDetail/?idx={friend_id}")
+        if friend_dom is None:
+            return None
+
+        user_name = friend_dom.xpath('//div[contains(@class, "name_block")]/text()')
+        rating_block_url = friend_dom.xpath('//img[contains(@class, "h_30") and contains(@class, "f_r")]/@src')
+        rating = friend_dom.xpath('//div[@class="rating_block"]/text()')
+        course_rank_url = friend_dom.xpath('//img[contains(@class, "h_35") and contains(@class, "f_l")]/@src')
+        class_rank_url = friend_dom.xpath('//img[contains(@class, "w_160") and contains(@class, "p_15") and contains(@class, "m_r_10")]/@src')
+        friend_icon = friend_dom.xpath('.//img[contains(@class, "w_112") and contains(@src, "img/Icon")]/@src')[0]
+        
+        trophy_type_block = friend_dom.xpath('.//div[contains(@class, "trophy_block") and contains(@class, "f_0")]/@class')
+                    
+        trophy_type = trophy_type_block[0].split(" ")[1] if trophy_type_block else "rainbow"
+        trophy_type = "rainbow" if trophy_type == "ランダム" else trophy_type.split("_")[1] if "_" in trophy_type else trophy_type
+
+        trophy_blocks = friend_dom.xpath('.//div[contains(@class, "trophy_inner_block") and contains(@class, "f_13")]')
+        if trophy_blocks:
+            trophy_block = trophy_blocks[0]
+            trophy_texts = trophy_block.xpath('.//text()')
+            trophy_content = trophy_texts[1] if len(trophy_texts) > 1 else "ERROR"
+        else:
+            trophy_content = "ERROR"
+
+        friend_title = {"text": trophy_content, "rarity": trophy_type}
+
+        # Convert rating to int
+        rating_str = rating[0].strip() if rating else "0"
+        try:
+            rating_int = int(rating_str)
+        except ValueError:
+            rating_int = 0
+
+        # Tour Leader Image
+        tour_leader_img = friend_dom.xpath(f".//img[contains(@src, 'img/Chara/')]/@src")[0]
+
+        # Recent Activity
+        activity_blocks = friend_dom.xpath('.//div[contains(@class, "town_block") and contains(@class, "f_0")]')
+
+        # loop through each activity block
+        activity_data = []
+        for activity_section in activity_blocks:
+            log_entry = activity_section.xpath('.//div[contains(@class, "t_l")]')
+            for log in log_entry:
+                activity_time = log.xpath('.//div[contains(@class, "f_11")]/text()')
+                log_text_block = log.xpath('.//div[contains(@class, "f_13")]')[0]
+
+                # Replace the image with the actual text
+                image_block = log_text_block.xpath('.//img/@src')
+                if len(image_block) > 0:
+                    image_src = image_block[0]
+                    if "img/diff_" in image_src:
+                        # Extract difficulty name from the image source
+                        # Get the last part after 'diff_'
+                        diff_name = image_src.split('/')[-1].split('.')[0].split('_')[-1]  
+                        raw_log = "".join(log.xpath('.//div[contains(@class, "f_13")]/text()')).strip()
+                        log_text = raw_log + f" (Difficulty: {diff_name})"
+                else:
+                    log_text = "".join(log.xpath('.//div[contains(@class, "f_13")]/text()')).strip()
+                
+                # Remove extra whitespace from log_text
+                log_text = " ".join(log_text.split())
+
+                activity_data.append({
+                    "time": activity_time[0].strip() if activity_time else "N/A",
+                    "text": log_text
+                })
+
+        friend_data = {
+            "id": friend_id,
+            "name": user_name[0].strip() if user_name else "N/A",
+            "icon": friend_icon,
+            "rating": rating_int,
+            "rating_block_url": rating_block_url[0] if rating_block_url else "N/A",
+            "course_rank_url": course_rank_url[0] if course_rank_url else "N/A",
+            "class_rank_url": class_rank_url[0] if class_rank_url else "N/A",
+            "friend_title": friend_title,
+            "tour_leader_img": tour_leader_img if tour_leader_img else "N/A",
+            "recent_activity": activity_data
+        }
+        
+
+        return friend_data #FriendPartial()._construct_from_dict(friend_details)

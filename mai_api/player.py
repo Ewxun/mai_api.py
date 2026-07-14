@@ -1,7 +1,8 @@
 
 class BasePlayer:
     '''Base class for player representation.'''
-    def __init__(self):
+    def __init__(self, client):
+        self.client = client
         self.name = None
         self.rating = None
         self.rating_block = None
@@ -18,7 +19,7 @@ class SelfPlayer(BasePlayer):
     '''
     def __init__(self):
         super().__init__()
-        self.cource_rank_url = None
+        self.course_rank_url = None
         self.class_rank_url = None
         self.nameplate_url = None
 
@@ -39,7 +40,7 @@ class SelfPlayer(BasePlayer):
         self.name = data.get("name")
         self.rating = data.get("rating")
         self.rating_block = data.get("rating_block")
-        self.cource_rank_url = data.get("cource_rank_url")
+        self.course_rank_url = data.get("course_rank_url")
         self.class_rank_url = data.get("class_rank_url")
         self.icon_url = data.get("icon_url")
         self.nameplate_url = data.get("nameplate_url")
@@ -72,9 +73,29 @@ class CircleMember(BasePlayer):
         super().__init__()
         
 
-class Friend(BasePlayer):
+class FriendPartial(BasePlayer):
     '''
-    Represents a friend of the player.
+    Represents friend data fetched from the friend list, which does not contain all details.
     '''
     def __init__(self):
         super().__init__()
+        self.friend_id = None
+        self.favorite = False
+
+        self.course_rank_url = None
+        self.class_rank_url = None
+        self.icon_url = None
+
+    def _construct_from_dict(self, data: dict):
+        self.friend_id = data.get("id")
+        self.name = data.get("name")
+        self.icon_url = data.get("icon")
+        self.rating = data.get("rating")
+        self.rating_block = data.get("rating_block")
+        self.title = data.get("title", {"text": None, "rarity": None})
+        self.favorite = data.get("favorite", False)
+
+        return self
+    
+    async def fetch_details(self, client) -> 'FriendPartial':
+        return await client.fetch_friend_details(self)
