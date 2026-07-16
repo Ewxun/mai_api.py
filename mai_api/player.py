@@ -98,4 +98,65 @@ class FriendPartial(BasePlayer):
         return self
     
     async def fetch_details(self, client) -> 'FriendPartial':
+        '''
+        Fetches the full details of the friend from the details page. Returns a Friend object.
+        Args:
+            client (Client): The client instance to use for fetching the details.
+        Returns:
+            Friend: The full details of the friend.
+        '''
         return await client.fetch_friend_details(self)
+    
+    async def favorite(self, client):
+        '''
+        Marks this friend as a favorite. Does nothing if the friend is already a favorite.
+        Args:
+            client (Client): The client instance to use.
+        '''
+        raise NotImplementedError("Coming soon")
+
+    async def unfavorite(self, client):
+        '''
+        Removes this friend from favorites. Does nothing if the friend is not a favorite.
+        Args:
+            client (Client): The client instance to use.
+        '''
+        raise NotImplementedError("Coming soon")
+    
+    async def register_rival(self, client):
+        '''
+        Registers friend as a rival. Raises an error if the rivals list is full (3).
+        Args:
+            client (Client): The client instance to use.
+        '''
+        raise NotImplementedError("Coming soon")
+    
+    async def unregister_rival(self, client):
+        '''
+        Unregisters friend as a rival.
+        Args:
+            client (Client): The client instance to use.
+        '''
+        raise NotImplementedError("Coming soon")
+    
+
+class Friend(FriendPartial):
+    '''
+    Represents friend fetched from the friend details endpoint. Does not have favorite status, as that is only available from the friend list.
+    '''
+    def __init__(self):
+        super().__init__()
+        self.course_rank_url = None
+        self.class_rank_url = None
+        self.nameplate_url = None
+        self.tour_leader_img = None
+        self.recent_activity = []
+        
+    def _construct_from_dict(self, data: dict):
+        super()._construct_from_dict(data)
+        self.course_rank_url = data.get("course_rank_url")
+        self.class_rank_url = data.get("class_rank_url")
+        self.nameplate_url = data.get("nameplate_url")
+        self.tour_leader_img = data.get("tour_leader_img")
+        self.recent_activity = data.get("recent_activity", [])
+        return self

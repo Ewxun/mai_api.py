@@ -7,8 +7,9 @@ from lxml import etree
 from typing import Literal, Union
 
 from .constants import API_BASE, USER_AGENTS
-from .player import SelfPlayer, FriendPartial
+from .player import Friend, SelfPlayer, FriendPartial
 from . import utils
+from .album import Album
 
 logger = logging.getLogger(__name__)
 
@@ -420,7 +421,7 @@ class MaiAPIClient:
                     if "img/diff_" in image_src:
                         # Extract difficulty name from the image source
                         # Get the last part after 'diff_'
-                        diff_name = image_src.split('/')[-1].split('.')[0].split('_')[-1]  
+                        diff_name = utils.diff_url_to_name(image_src) 
                         raw_log = "".join(log.xpath('.//div[contains(@class, "f_13")]/text()')).strip()
                         log_text = raw_log + f" (Difficulty: {diff_name})"
                 else:
@@ -448,4 +449,38 @@ class MaiAPIClient:
         }
         
 
-        return friend_data #FriendPartial()._construct_from_dict(friend_details)
+        return Friend()._construct_from_dict(friend_data)
+    
+    async def get_album(self) -> list[Album]:
+        """Fetch album data
+        Returns:
+            list[Album]: List of Album objects.
+        """
+        album_dom = await self._fetch_dom("playerData/photo/")
+        if album_dom is None:
+            return None
+
+        album_blocks = album_dom.xpath('//div[contains(@class, "m_10") and contains(@class, "f_0")]')
+
+        album_data = []
+        for album_block in album_blocks:
+            time = album_block.xpath('.//div[contains(@class, "block_info")]/text()')
+            diff_url = album_block.xpath('.//img[contains(@class, "h_16") and contains(@class, "f_l")]/@src')
+            diff = utils.diff_url_to_name(diff_url[0]) if diff_url else "N/A"
+            song_name = album_block.xpath('.//div[contains(@class, "black_block") and contains(@class, "break")]/text()')[0].strip()
+            image_url = album_block.xpath('.//img[contains(@class, "w_430")]/@src')[0] 
+            location = album_block.xpath('.//div[contains(@class, "see_through_block") and contains(@class, "break")]/text()')[0].strip()
+
+            album_id = image_url.split('/')[-1]
+
+            album = Album({
+                "id": album_id,
+                "name": song_name,
+                "time": time[0].strip() if time else "N/A",
+                "difficulty": diff,
+                "image_url": image_url,
+                "location": location
+            })
+            album_data.append(album)
+
+        return album_data

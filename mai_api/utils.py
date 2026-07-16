@@ -99,3 +99,8 @@ def get_partner_details(filename):
         },
     }
     return partner_map.get(filename)
+
+def diff_url_to_name(url: str):
+    if "img/diff_" in url:
+        diff_name = url.split('/')[-1].split('.')[0].split('_')[-1]
+        return diff_name
