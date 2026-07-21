@@ -100,7 +100,24 @@ def get_partner_details(filename):
     }
     return partner_map.get(filename)
 
-def diff_url_to_name(url: str):
-    if "img/diff_" in url:
-        diff_name = url.split('/')[-1].split('.')[0].split('_')[-1]
-        return diff_name
+class URL_Convert:
+    '''
+    Util functions to convert maimai resource urls to human friendly terms
+    '''
+    def __init__(self):
+        return
+
+    def diff(self, url: str):
+        if "img/diff_" in url:
+            diff_name = url.split('/')[-1].split('.')[0].split('_')[-1]
+            return diff_name
+        
+    def music_icon(self, url: str):
+        if "img/music_" in url:
+            music_icon = url.split('/')[-1].split('.')[0].split('_')[-1]
+            return music_icon
+        
+    def playlog(self, url: str):
+        if "img/playlog" in url:
+            playlog_name = url.split('/')[-1].split('.')[0].split('_')[-1]
+            return playlog_name if playlog_name != 'dummy' else None

@@ -9,9 +9,10 @@ from typing import Literal, Union
 from .constants import API_BASE, USER_AGENTS
 from .player import Friend, SelfPlayer, FriendPartial
 from . import utils
-from .album import Album
+from .songs import Album, SongRecord
 
 logger = logging.getLogger(__name__)
+url_convert = utils.URL_Convert()
 
 class MaiAPIClient:
     def __init__(self, sega_id: str, password: str, region: Literal["jp", "intl"] = "intl", session: aiohttp.ClientSession = None, retry_attempts: int = 3):
@@ -421,7 +422,7 @@ class MaiAPIClient:
                     if "img/diff_" in image_src:
                         # Extract difficulty name from the image source
                         # Get the last part after 'diff_'
-                        diff_name = utils.diff_url_to_name(image_src) 
+                        diff_name = url_convert.diff(image_src) 
                         raw_log = "".join(log.xpath('.//div[contains(@class, "f_13")]/text()')).strip()
                         log_text = raw_log + f" (Difficulty: {diff_name})"
                 else:
@@ -466,7 +467,7 @@ class MaiAPIClient:
         for album_block in album_blocks:
             time = album_block.xpath('.//div[contains(@class, "block_info")]/text()')
             diff_url = album_block.xpath('.//img[contains(@class, "h_16") and contains(@class, "f_l")]/@src')
-            diff = utils.diff_url_to_name(diff_url[0]) if diff_url else "N/A"
+            diff = url_convert.diff(diff_url[0]) if diff_url else "N/A"
             song_name = album_block.xpath('.//div[contains(@class, "black_block") and contains(@class, "break")]/text()')[0].strip()
             image_url = album_block.xpath('.//img[contains(@class, "w_430")]/@src')[0] 
             location = album_block.xpath('.//div[contains(@class, "see_through_block") and contains(@class, "break")]/text()')[0].strip()
@@ -484,3 +485,63 @@ class MaiAPIClient:
             album_data.append(album)
 
         return album_data
+
+    async def get_recent_plays(self) -> list[SongRecord]:
+        record_dom = self._fetch_dom("record/")
+        record_blocks = record_dom.xpath('.//div[contains(@class, "p_10") and contains(@class, "v_b")]')
+
+        song_records = []
+        for record_block in record_blocks:
+            playlog_top = record_block.xpath('.//div[contains(@class, "playlog_top_container")]')[0]
+            diff_img = playlog_top.xpath('.//img[contains(@class, "playlog_diff")]/@src')[0]
+            diff_name = url_convert.diff(diff_img)
+
+            play_trackcount = playlog_top.xpath('.//div[contains(@class, "sub_title") and contains(@class, "t_c")]/span[1]/text()')[0].strip()
+            play_datetime = playlog_top.xpath('.//div[contains(@class, "sub_title") and contains(@class, "t_c")]/span[2]/text()')[0].strip()
+
+            song_name = record_block.xpath('.//div[contains(@class, "w_80") and contains(@class, "f_r")]/text()')[0].strip()
+            song_level = record_block.xpath('.//div[contains(@class, "playlog_level_icon")]/text()')[0].strip()
+            song_type_img = record_block.xpath('.//img[contains(@class, "playlog_music_kind_icon")]/@src')[0]
+            song_type = url_convert.music_icon(song_type_img)
+            song_cover_img = record_block.xpath('.//img[contains(@class, "music_img")]/@src')[0]
+
+            song_score = "".join(record_block.xpath('.//div[contains(@class, "playlog_achievement_txt")]//text()')).strip()
+            song_score_rank_img = record_block.xpath('.//img[contains(@class, "playlog_scorerank")]/@src')[0]
+            song_score_rank = url_convert.playlog(song_score_rank_img)
+            song_dx_score = record_block.xpath('.//div[contains(@class, "p_r_5") and contains(@class, "f_r")]//text()')[0].strip()
+
+            dx_star_url = record_block.xpath('.//img[contains(@class, "playlog_deluxscore_star")]/@src')
+            dx_star = url_convert.playlog(dx_star_url[0]) if dx_star_url else 0
+
+            stat_block = record_block.xpath('.//div[contains(@class, "playlog_result_innerblock")]')[0]
+            stat_imgs = stat_block.xpath('.//img[contains(@class, "h_35") and contains(@class, "m_5")]/@src')
+
+            stats = []
+            for stat_img in stat_imgs:
+                stat_name = url_convert.playlog(stat_img)
+                if stat_name:
+                    stats.append(stat_name)
+            vs_rank_img = stat_block.xpath('.//img[contains(@class, "playlog_matching_icon")]/@src')
+            vs_rank = url_convert.playlog(vs_rank_img[0]) if vs_rank_img else None
+
+            record_id = record_block.xpath('.//form[contains(@class, "m_t_5") and contains(@class, "t_r")]/input[1]/@value')[0]
+
+            record_data = {
+                "id": record_id,
+                "play_datetime": play_datetime,
+                "play_trackcount": play_trackcount,
+                "song_name": song_name,
+                "song_level": song_level,
+                "song_type": song_type,
+                "diff_name": diff_name,
+                "song_score": song_score,
+                "song_score_rank": song_score_rank,
+                "song_dx_score": song_dx_score,
+                "dx_star": dx_star,
+                "song_cover_img": song_cover_img,
+                "vs_rank": vs_rank,
+                "stats": stats
+            }
+            song_records.append(SongRecord(record_data))
+
+        return song_records
