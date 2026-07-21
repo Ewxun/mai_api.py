@@ -13,9 +13,10 @@ I'm only using this for personal use and learning purposes, so don't expect this
 - Fetch overall player stats
 - Fetch friends info
 - Fetch album data + download album images
+- Fetch recent plays
 
 ## To-Do
-- [ ] Fetch recent plays
+- [ ] Fetch recent record details
 - [ ] Fetch per song stats
 - [ ] Fetch circle info
 - [ ] Fetch event info
