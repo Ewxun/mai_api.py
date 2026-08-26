@@ -16,10 +16,10 @@ I'm only using this for personal use and learning purposes, so don't expect this
 - Fetch recent plays
 
 ## To-Do
-- [ ] Fetch recent record details
 - [ ] Fetch per song stats
 - [ ] Fetch circle info
 - [ ] Fetch event info
+- [ ] Fetch leaderboard
 
 
 ## Contact

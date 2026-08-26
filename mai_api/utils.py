@@ -104,8 +104,8 @@ class URL_Convert:
     '''
     Util functions to convert maimai resource urls to human friendly terms
     '''
-    def __init__(self):
-        return
+    def __init__(self, client):
+        self.client = client
 
     def diff(self, url: str):
         if "img/diff_" in url:
@@ -121,3 +121,41 @@ class URL_Convert:
         if "img/playlog" in url:
             playlog_name = url.split('/')[-1].split('.')[0].split('_')[-1]
             return playlog_name if playlog_name != 'dummy' else None
+
+    async def get_tour_member(self, url: str):
+        if "img/tour_member" in url:
+            tour_member_dom = await self.client._fetch_dom("collection/character/")
+            event_member_dom = await self.client._fetch_dom("collection/eventCharacter/")
+
+            tour_member = {
+                "name": None,
+                "chiho": None,
+                "level": None,
+                "stars": None,
+                "is_from_event": False,
+                "is_obtained": False,
+                "image_url": url
+            }
+
+            tour_doms = [tour_member_dom, event_member_dom]
+            for idx, dom in enumerate(tour_doms):
+                if idx == 1:
+                    tour_member["is_from_event"] = True
+
+                for member_block in dom.xpath('//div[contains(@class, "see_through_block") and contains(@class, "f_0")]'):
+                    tour_member_url = member_block.xpath('.//img[contains(@class, "chara_cycle_img")]/@src')[0]
+                    if tour_member_url == url:
+                        member_name = member_block.xpath('.//div[contains(@class, "p_t_10") and contains(@class, "break")]/text()')[0].strip()
+                        member_chiho_name = member_block.xpath('preceding-sibling::div[contains(@class, "t_c") and contains(@class, "f_b")]/text()')[0].strip()
+                        is_obtained = not bool(member_block.xpath('.//div[contains(@class, "gray_img")]'))
+                    if is_obtained:
+                        star_count = int(member_block.xpath('.//span[contains(@class, "collection_chara_awakening_block_txt")]/text()')[0].strip())
+                        level = int(member_block.xpath('.//div[contains(@class, "collection_chara_lv_block")]/text()')[0].strip().replace("Lv", ""))
+                        tour_member["stars"] = star_count
+                        tour_member["level"] = level
+
+                    tour_member["name"] = member_name
+                    tour_member["chiho"] = member_chiho_name
+                    tour_member["is_obtained"] = is_obtained
+
+                    return tour_member
