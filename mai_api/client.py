@@ -193,7 +193,7 @@ class MaiAPIClient:
             return None
         
 
-    async def get_profile(self) -> SelfPlayer:
+    async def get_profile(self, *, get_dan_rank=False) -> SelfPlayer:
         """Fetch player profile data"""
         paths = [
             "playerData/",
@@ -286,11 +286,47 @@ class MaiAPIClient:
         presents_block = player_dom.xpath("//div[contains(@class, 'intimateup_txt')]/text()")
         presents = presents_block[0].rsplit(" ", 1)[1] if len(presents_block) > 0 else "0"
 
+        course = {
+            "rank_icon": course_rank_url[0] if course_rank_url else "N/A",
+            "current_rank": None,
+            "score": None
+        }
+
+        if get_dan_rank:
+            dan_dom = await self._fetch_dom(f"ranking/courseRanking/")
+
+            select_block = dan_dom.xpath('//select[@name="course"]')[0]
+            dan_ids = []
+            for option in select_block.xpath('.//option'):
+                course_name = option.text.strip()
+                course_value = option.get('value')
+
+                if course_name.startswith(('EX', 'MA')):
+                    continue
+
+                dan_ids.append((course_name, course_value))
+
+            current_dan = "初心者"  # default value
+            dan_score = None
+            for dan_name, dan_id in reversed(dan_ids):  # Reverse to check from the highest dan
+                fetch_path = f"ranking/courseRanking/search/?course={dan_id}&scoreType=2&rankingType=3&diff=0"
+                dan_ranking_dom = await self.fetch_dom(fetch_path)
+
+                dan_score = dan_ranking_dom.xpath('//div[contains(@class, "p_r_10") and contains(@class, "f_14")]/text()')[0].strip()
+
+                if "%" in dan_score:
+                    current_dan = dan_name
+                    dan_score = float(dan_score.replace("%", ""))
+                    break
+
+            course["current_rank"] = current_dan
+            course["score"] = dan_score
+
         user_info = {
             "name": user_name[0] if user_name else "NAME_ERROR",
             "rating_block": rating_block_url[0] if rating_block_url else "N/A",
             "rating": rating_int,
-            "course_rank_url": course_rank_url[0] if course_rank_url else "N/A",
+            "course": course,
             "class_rank_url": class_rank_url[0] if class_rank_url else "N/A",
             "icon_url": icon_url[0] if icon_url else "N/A",
             "nameplate_url": nameplate_url[0] if nameplate_url else "N/A",

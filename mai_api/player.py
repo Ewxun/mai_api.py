@@ -24,7 +24,7 @@ class SelfPlayer(BasePlayer):
         self.rating = data.get("rating")
         self.rating_block = data.get("rating_block")
 
-        self.course_rank_url = data.get("course_rank_url")
+        self.course = data.get("course")
         self.class_rank_url = data.get("class_rank_url")
         self.icon_url = data.get("icon_url")
         self.nameplate_url = data.get("nameplate_url")
